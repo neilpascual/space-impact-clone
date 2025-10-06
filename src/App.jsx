@@ -515,10 +515,23 @@ export default function App() {
     // run effect only once on mount
   }, []); // <<-- important: run once
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
-      <div className="text-sm font-mono mb-3">Arrow keys = move, R = Restart, M = Menu</div>
-      <canvas ref={canvasRef} className="border-4 border-green-500" style={{ imageRendering: "pixelated" }} />
+return (
+  <div className="flex items-center justify-center min-h-screen bg-black text-white">
+    <div className="flex flex-col items-center justify-center text-center p-4">
+      <div className="text-sm font-mono mb-3">
+        Arrow keys = move, R = Restart, M = Menu
+      </div>
+      <canvas
+        ref={canvasRef}
+        className="border-4 border-green-500 rounded-lg shadow-lg"
+        style={{
+          imageRendering: "pixelated",
+          maxWidth: "100%",
+          height: "auto",
+        }}
+      />
     </div>
-  );
+  </div>
+);
+
 }
