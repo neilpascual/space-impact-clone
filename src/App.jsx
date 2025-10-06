@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 export default function App() {
   const canvasRef = useRef(null);
 
-  // Game state
+  // React state (for UI)
   const [mode, setMode] = useState(null);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -18,10 +18,76 @@ export default function App() {
     }
   });
 
+  // Refs to hold the *current* values for the game loop (avoids stale closures)
   const countdownStartTime = useRef(null);
+  const modeRef = useRef(mode);
+  const scoreRef = useRef(score);
+  const livesRef = useRef(lives);
+  const gameOverRef = useRef(gameOver);
+  const levelRef = useRef(level);
+  const levelTargetRef = useRef(levelTarget);
+
+  // helper setters that update both state and ref
+  function setModeAndRef(v) {
+    modeRef.current = v;
+    setMode(v);
+  }
+  function setScoreAndRef(vOrFn) {
+    if (typeof vOrFn === "function") {
+      setScore((s) => {
+        const nv = vOrFn(s);
+        scoreRef.current = nv;
+        return nv;
+      });
+    } else {
+      scoreRef.current = vOrFn;
+      setScore(vOrFn);
+    }
+  }
+  function setLivesAndRef(vOrFn) {
+    if (typeof vOrFn === "function") {
+      setLives((l) => {
+        const nv = vOrFn(l);
+        livesRef.current = nv;
+        return nv;
+      });
+    } else {
+      livesRef.current = vOrFn;
+      setLives(vOrFn);
+    }
+  }
+  function setGameOverAndRef(v) {
+    gameOverRef.current = v;
+    setGameOver(v);
+  }
+  function setLevelAndRef(vOrFn) {
+    if (typeof vOrFn === "function") {
+      setLevel((l) => {
+        const nv = vOrFn(l);
+        levelRef.current = nv;
+        return nv;
+      });
+    } else {
+      levelRef.current = vOrFn;
+      setLevel(vOrFn);
+    }
+  }
+  function setLevelTargetAndRef(vOrFn) {
+    if (typeof vOrFn === "function") {
+      setLevelTarget((t) => {
+        const nv = vOrFn(t);
+        levelTargetRef.current = nv;
+        return nv;
+      });
+    } else {
+      levelTargetRef.current = vOrFn;
+      setLevelTarget(vOrFn);
+    }
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
     const WIDTH = 640;
@@ -61,8 +127,8 @@ export default function App() {
     const handleKeyDown = (e) => {
       keys[e.key] = true;
 
-      if (!mode && (e.key === "1" || e.key === "2")) {
-        setMode(e.key === "1" ? "level" : "endless");
+      if (!modeRef.current && (e.key === "1" || e.key === "2")) {
+        setModeAndRef(e.key === "1" ? "level" : "endless");
         countdownStartTime.current = Date.now();
       }
 
@@ -75,14 +141,19 @@ export default function App() {
 
     // --- Difficulty ---
     function getDifficultyMultiplier() {
-      return mode === "level" ? Math.max(0, level - 1) * 0.4 : Math.floor(score / 200) * 0.25;
+      return modeRef.current === "level"
+        ? Math.max(0, levelRef.current - 1) * 0.4
+        : Math.floor(scoreRef.current / 200) * 0.25;
     }
 
     // --- Score / Boss ---
     function addScore(points) {
-      setScore((s) => {
+      setScoreAndRef((s) => {
         const newS = s + points;
-        if (mode === "level" && !boss && newS >= levelTarget) spawnBossForLevel(level);
+        // check boss spawn for level mode
+        if (modeRef.current === "level" && !boss && newS >= levelTargetRef.current) {
+          spawnBossForLevel(levelRef.current);
+        }
         return newS;
       });
     }
@@ -106,10 +177,10 @@ export default function App() {
       addScore(100);
       boss = null;
       spawnAllowed = true;
-      if (mode === "level") {
-        setLevel((lvl) => {
+      if (modeRef.current === "level") {
+        setLevelAndRef((lvl) => {
           const next = lvl + 1;
-          setLevelTarget(next * 200);
+          setLevelTargetAndRef(next * 200);
           return next;
         });
       }
@@ -129,11 +200,11 @@ export default function App() {
       powerupTimer = 0;
       bulletTimer = 0;
       spawnAllowed = true;
-      setScore(0);
-      setLives(3);
-      setGameOver(false);
-      setLevel(1);
-      setLevelTarget(200);
+      setScoreAndRef(0);
+      setLivesAndRef(3);
+      setGameOverAndRef(false);
+      setLevelAndRef(1);
+      setLevelTargetAndRef(200);
       ship.x = 40;
       ship.y = HEIGHT / 2 - ship.h / 2;
       countdownStartTime.current = Date.now();
@@ -141,14 +212,14 @@ export default function App() {
 
     function goToMenu() {
       restartGame();
-      setMode(null);
-      setGameOver(false);
+      setModeAndRef(null);
+      setGameOverAndRef(false);
     }
 
     function persistLeaderboardIfNeeded() {
-      if (mode === "endless") {
+      if (modeRef.current === "endless") {
         const existing = JSON.parse(localStorage.getItem("si_leaderboard_v1") || "[]");
-        existing.push(score);
+        existing.push(scoreRef.current);
         existing.sort((a, b) => b - a);
         const top = existing.slice(0, 10);
         localStorage.setItem("si_leaderboard_v1", JSON.stringify(top));
@@ -214,12 +285,17 @@ export default function App() {
 
     function updateGameObjects() {
       // --- Bullets ---
-      bullets.forEach((b, i) => {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
         b.x += b.speed;
-        if (b.x > WIDTH) bullets.splice(i, 1);
+        if (b.x > WIDTH) {
+          bullets.splice(i, 1);
+          continue;
+        }
 
         // Hit enemies
-        enemies.forEach((e, j) => {
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
           if (rectsCollide(b, e)) {
             e.hp--;
             bullets.splice(i, 1);
@@ -228,8 +304,9 @@ export default function App() {
               enemies.splice(j, 1);
               addScore(e.type === "miniboss" ? 15 : 5);
             }
+            break;
           }
-        });
+        }
 
         // Hit boss
         if (boss && rectsCollide(b, boss)) {
@@ -237,34 +314,40 @@ export default function App() {
           bullets.splice(i, 1);
           if (boss.hp <= 0) handleBossDefeat();
         }
-      });
+      }
 
       // --- Enemies ---
-      enemies.forEach((e, i) => {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
         e.x -= e.speed;
         if (e.type === "zigzag") e.y += Math.sin(Date.now() / 200 + e.angle) * 2;
-        if (e.x + e.w < 0) enemies.splice(i, 1);
+        if (e.x + e.w < 0) {
+          enemies.splice(i, 1);
+          continue;
+        }
 
         // Collide with player
         if (rectsCollide(e, ship)) {
           enemies.splice(i, 1);
           loseLife();
         }
-      });
+      }
 
       // --- Powerups ---
-      powerups.forEach((p, i) => {
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
         p.x -= p.speed;
         if (rectsCollide(p, ship)) {
-          if (p.type === "life") setLives((l) => l + 1);
+          if (p.type === "life") setLivesAndRef((l) => l + 1);
           else if (p.type === "double") {
             doubleShot = true;
             doubleTimer = 600; // lasts ~10s
           }
           powerups.splice(i, 1);
+          continue;
         }
         if (p.x + p.w < 0) powerups.splice(i, 1);
-      });
+      }
 
       // --- Boss movement ---
       if (boss) {
@@ -280,10 +363,10 @@ export default function App() {
     }
 
     function loseLife() {
-      setLives((l) => {
+      setLivesAndRef((l) => {
         const remaining = l - 1;
         if (remaining <= 0) {
-          setGameOver(true);
+          setGameOverAndRef(true);
           persistLeaderboardIfNeeded();
         }
         return remaining;
@@ -307,7 +390,7 @@ export default function App() {
       });
 
       // Menu
-      if (!mode) {
+      if (!modeRef.current) {
         ctx.fillStyle = "#0f0";
         ctx.font = "20px monospace";
         ctx.fillText("SPACE IMPACT - Retro Clone", WIDTH / 2 - 150, HEIGHT / 2 - 60);
@@ -315,7 +398,7 @@ export default function App() {
         ctx.fillText("Press 1 → Level Mode", WIDTH / 2 - 180, HEIGHT / 2 - 20);
         ctx.fillText("Press 2 → Endless Mode", WIDTH / 2 - 180, HEIGHT / 2 + 10);
         const blink = Math.floor(Date.now() / 500) % 2 === 0;
-        if (blink) ctx.fillStyle = "#ff0", ctx.fillText("PRESS START", WIDTH / 2 - 70, HEIGHT / 2 + 60);
+        if (blink) (ctx.fillStyle = "#ff0"), ctx.fillText("PRESS START", WIDTH / 2 - 70, HEIGHT / 2 + 60);
         animationId = requestAnimationFrame(gameLoop);
         return;
       }
@@ -333,14 +416,14 @@ export default function App() {
       }
 
       // Game over
-      if (gameOver) {
+      if (gameOverRef.current) {
         ctx.fillStyle = "#fff";
         ctx.font = "22px monospace";
         ctx.fillText("GAME OVER", WIDTH / 2 - 70, HEIGHT / 2 - 10);
         ctx.font = "16px monospace";
         ctx.fillText("Press R to Restart", WIDTH / 2 - 80, HEIGHT / 2 + 20);
         ctx.fillText("Press M for Menu", WIDTH / 2 - 70, HEIGHT / 2 + 44);
-        if (mode === "endless") {
+        if (modeRef.current === "endless") {
           ctx.fillStyle = "#ff0";
           ctx.fillText("Top Scores:", WIDTH / 2 - 60, HEIGHT / 2 + 80);
           ctx.fillStyle = "#fff";
@@ -353,10 +436,10 @@ export default function App() {
       // HUD
       ctx.fillStyle = "#0f0";
       ctx.font = "16px monospace";
-      ctx.fillText(`Score: ${score}`, 12, 20);
-      ctx.fillText(`Lives: ${lives}`, 12, 40);
-      ctx.fillText(`Mode: ${mode === "level" ? `Level ${level}` : "Endless"}`, 12, 60);
-      if (mode === "level") ctx.fillText(`Target: ${levelTarget}`, 12, 80);
+      ctx.fillText(`Score: ${scoreRef.current}`, 12, 20);
+      ctx.fillText(`Lives: ${livesRef.current}`, 12, 40);
+      ctx.fillText(`Mode: ${modeRef.current === "level" ? `Level ${levelRef.current}` : "Endless"}`, 12, 60);
+      if (modeRef.current === "level") ctx.fillText(`Target: ${levelTargetRef.current}`, 12, 80);
 
       // Player
       ctx.fillStyle = "#0ff";
@@ -411,12 +494,13 @@ export default function App() {
       });
 
       // Draw explosions
-      explosions.forEach((ex, i) => {
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        const ex = explosions[i];
         ctx.fillStyle = "#fff";
         ctx.fillRect(ex.x, ex.y, ex.w, ex.h);
         ex.timer--;
         if (ex.timer <= 0) explosions.splice(i, 1);
-      });
+      }
 
       animationId = requestAnimationFrame(gameLoop);
     }
@@ -428,7 +512,8 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [mode, score, lives, level, levelTarget, gameOver]);
+    // run effect only once on mount
+  }, []); // <<-- important: run once
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
