@@ -517,7 +517,6 @@ export default function App() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
-      <h1 className="text-2xl font-mono mb-1">Space Impact — Retro Clone</h1>
       <div className="text-sm font-mono mb-3">Arrow keys = move, R = Restart, M = Menu</div>
       <canvas ref={canvasRef} className="border-4 border-green-500" style={{ imageRendering: "pixelated" }} />
     </div>
