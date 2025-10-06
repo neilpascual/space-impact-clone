@@ -516,22 +516,40 @@ export default function App() {
   }, []); // <<-- important: run once
 
 return (
-  <div className="flex items-center justify-center min-h-screen bg-black text-white">
-    <div className="flex flex-col items-center justify-center text-center p-4">
-      <div className="text-sm font-mono mb-3">
-        Arrow keys = move, R = Restart, M = Menu
+  <div className="flex items-center justify-center h-screen bg-black text-white">
+    <div className="flex flex-col items-center text-center space-y-4 p-4 w-full max-w-3xl">
+      {/* Game Title */}
+      <h1 className="text-2xl sm:text-3xl font-mono text-green-400 drop-shadow-md">
+        🚀 Space Impact
+      </h1>
+
+      {/* Instructions */}
+      <p className="text-xs sm:text-sm font-mono text-gray-400">
+        Arrow Keys / Swipe to Move • R = Restart • M = Menu
+      </p>
+
+      {/* Canvas */}
+      <div className="flex justify-center w-full">
+        <canvas
+          ref={canvasRef}
+          className="border-4 border-green-500 rounded-lg shadow-[0_0_20px_rgba(0,255,0,0.3)]"
+          style={{
+            imageRendering: "pixelated",
+            width: "100%",
+            maxWidth: "640px",
+            height: "auto",
+            aspectRatio: "640 / 368",
+          }}
+        />
       </div>
-      <canvas
-        ref={canvasRef}
-        className="border-4 border-green-500 rounded-lg shadow-lg"
-        style={{
-          imageRendering: "pixelated",
-          maxWidth: "100%",
-          height: "auto",
-        }}
-      />
+
+      {/* Footer / Version / Credits */}
+      <p className="text-[10px] sm:text-xs text-gray-500 font-mono mt-2">
+        Built with React + Tailwind • by Neil ⚡
+      </p>
     </div>
   </div>
 );
+
 
 }
